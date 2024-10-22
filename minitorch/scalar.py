@@ -112,21 +112,43 @@ class Scalar:
         return self.history is not None and self.history.last_fn is None
 
     def is_constant(self) -> bool:
+        """True if this variable was created by an operation on constants."""
         return self.history is None
 
     @property
     def parents(self) -> Iterable[Variable]:
-        """Get the variables used to create this one."""
+        """Returns the inputs that were used to create this variable."""
         assert self.history is not None
         return self.history.inputs
 
     def chain_rule(self, d_output: Any) -> Iterable[Tuple[Variable, Any]]:
+        """Applies the chain rule to compute gradients for backpropagation.
+
+        Args:
+        ----
+            d_output: The derivative of the output with respect to this variable.
+
+        Returns:
+        -------
+            An iterable of tuples containing parent variables and their corresponding derivatives.
+
+        """
         h = self.history
         assert h is not None
         assert h.last_fn is not None
         assert h.ctx is not None
 
-        raise NotImplementedError("Need to include this file from past assignment.")
+        res = []
+        dev = h.last_fn._backward(h.ctx, d_output)
+        if isinstance(dev, tuple):
+            for i in range(len(h.inputs)):
+                if not h.inputs[i].is_constant():
+                    res.append((h.inputs[i], dev[i]))
+        else:
+            for var in h.inputs:
+                if not var.is_constant():
+                    res.append((var, dev))
+        return res
 
     def backward(self, d_output: Optional[float] = None) -> None:
         """Calls autodiff to fill in the derivatives for the history of this object.
@@ -141,17 +163,74 @@ class Scalar:
             d_output = 1.0
         backpropagate(self, d_output)
 
-    raise NotImplementedError("Need to include this file from past assignment.")
+    # TODO: Implement for Task 1.2.
+    def __lt__(self, b: ScalarLike) -> Scalar:
+        return LT.apply(self, b)
+
+    def __gt__(self, b: ScalarLike) -> Scalar:
+        return LT.apply(b, self)
+
+    def __add__(self, b: ScalarLike) -> Scalar:
+        return Add.apply(self, b)
+
+    def __neg__(self) -> Scalar:
+        return Neg.apply(self)
+
+    def __sub__(self, b: ScalarLike) -> Scalar:
+        return Add.apply(self, -b)
+
+    def __eq__(self, b: ScalarLike) -> Scalar:
+        return EQ.apply(self, b)
+
+    def log(self) -> Scalar:
+        """Computes the natural logarithm of the scalar.
+
+        Returns
+        -------
+            Scalar: The result of applying the logarithm function.
+
+        """  # Added a blank line here
+        return Log.apply(self)
+
+    def exp(self) -> Scalar:
+        """Computes the exponential of the scalar.
+
+        Returns
+        -------
+            Scalar: The result of applying the exponential function.
+
+        """
+        return Exp.apply(self)
+
+    def sigmoid(self) -> Scalar:
+        """Computes the sigmoid of the scalar.
+
+        Returns
+        -------
+            Scalar: The result of applying the sigmoid function.
+
+        """
+        return Sigmoid.apply(self)
+
+    def relu(self) -> Scalar:
+        """Computes the ReLU of the scalar.
+
+        Returns
+        -------
+            Scalar: The result of applying the ReLU function.
+
+        """
+        return ReLU.apply(self)
 
 
 def derivative_check(f: Any, *scalars: Scalar) -> None:
     """Checks that autodiff works on a python function.
     Asserts False if derivative is incorrect.
 
-    Parameters
-    ----------
-        f : function from n-scalars to 1-scalar.
-        *scalars  : n input scalar values.
+    Args:
+    ----
+        f : A function from n-scalars to 1-scalar.
+        *scalars : n input scalar values.
 
     """
     out = f(*scalars)
